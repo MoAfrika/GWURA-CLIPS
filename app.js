@@ -1,4 +1,4 @@
-let API_URL = "http://localhost:5501";
+let API_URL = window.location.protocol.startsWith('http') ? window.location.origin : "http://localhost:5501";
 let isBackendAvailable = false;
 
 const app = {
@@ -96,11 +96,20 @@ const app = {
     },
 
     async checkBackend() {
-        const ports = [5501, 5500];
-        for (const port of ports) {
-            const url = `http://localhost:${port}`;
+        const candidates = [];
+        if (window.location.protocol.startsWith('http')) {
+            candidates.push(window.location.origin);
+        }
+        candidates.push('http://localhost:5501', 'http://127.0.0.1:5501', 'http://localhost:5500', 'http://127.0.0.1:5500');
+
+        const seen = new Set();
+        for (const url of candidates.filter((item) => {
+            if (seen.has(item)) return false;
+            seen.add(item);
+            return true;
+        })) {
             try {
-                const res = await fetch(url, { method: 'GET' });
+                const res = await fetch(`${url}/health`, { method: 'GET' });
                 if (!res.ok) throw new Error('Backend unreachable');
                 let health;
                 try {
@@ -114,14 +123,14 @@ const app = {
                 const badge = document.getElementById('backend-status');
                 if (badge) {
                     const aiState = health.ai_supported
-                        ? health.ai_loaded
+                        ? health.ai_enabled
                             ? 'AI READY'
                             : 'AI PENDING'
                         : 'AI DISABLED';
-                    badge.innerText = `SERVER ONLINE (${port}) • ${aiState}`;
+                    badge.innerText = `SERVER ONLINE - ${aiState}`;
                     badge.classList.add('online');
                     badge.title = health.ai_supported
-                        ? 'Backend server is online. AI model will load on first analyze.'
+                        ? `Backend server is online. Transcription backend: ${health.ai_backend || 'configured on server'}.`
                         : 'Backend server is online but AI is disabled.';
                 }
                 console.log(`Backend detected on ${url}`);
@@ -136,7 +145,7 @@ const app = {
         if (badge) {
             badge.innerText = 'OFFLINE MODE';
             badge.classList.remove('online');
-            badge.title = 'Run the backend server on port 5501 to enable AI transcription and clip analysis.';
+            badge.title = 'Run the backend server and open the app from that server URL to enable uploads, AI transcription, and clip rendering.';
         }
         console.log('Offline mode: backend not found');
         return false;
@@ -381,6 +390,14 @@ const app = {
 
         const data = await res.json();
         this.clips = data.clips.map((c) => ({ ...c, tagClass: this.getTagClass(c.type) }));
+        if (data.ai) {
+            const badge = document.getElementById('backend-status');
+            if (badge) {
+                const aiState = data.ai.ai_enabled ? 'AI READY' : 'AI PENDING';
+                badge.innerText = `SERVER ONLINE - ${aiState}`;
+                badge.title = data.ai.ai_error || `Transcription backend: ${data.ai.ai_backend || 'configured on server'}.`;
+            }
+        }
         this.renderClips();
         if (this.clips.length) {
             this.loadClip(0);
@@ -502,12 +519,27 @@ const app = {
     },
 
     generateCaptions() {
+        if (Array.isArray(this.currentClip.captions) && this.currentClip.captions.length) {
+            this.captions = this.currentClip.captions
+                .filter((cap) => cap.text && cap.end >= this.currentClip.start && cap.start <= this.currentClip.end)
+                .map((cap) => ({
+                    time: Math.max(this.currentClip.start, cap.start),
+                    end: Math.min(this.currentClip.end, cap.end || cap.start + 3),
+                    text: cap.text
+                }));
+            this.activeCaptionIndex = -1;
+            this.renderCaptionEditor();
+            return;
+        }
+
         const dur = this.currentClip.end - this.currentClip.start;
         const count = Math.max(1, Math.ceil(dur / 3));
         this.captions = [];
         for (let i = 0; i < count; i++) {
+            const time = this.currentClip.start + i * 3;
             this.captions.push({
-                time: this.currentClip.start + i * 3,
+                time,
+                end: Math.min(this.currentClip.end, time + 3),
                 text: i === 0 && this.currentClip.caption_preview !== 'Add caption...' ? this.currentClip.caption_preview : 'Type caption here...'
             });
         }
@@ -519,9 +551,9 @@ const app = {
         if (!hint) return;
 
         if (isBackendAvailable) {
-            hint.innerHTML = 'Backend available: upload the video and wait for AI analysis to generate transcript captions and better clip timing.';
+            hint.innerHTML = 'Backend available: AI transcript segments will appear here when transcription is configured on the server.';
         } else {
-            hint.innerHTML = 'Offline Mode: Auto-transcription is disabled. Placeholders are provided for timing. Run the backend server on port 5501 to enable transcripts.';
+            hint.innerHTML = 'Offline Mode: Auto-transcription is disabled. Run the backend server and open this app from the server URL to enable transcripts.';
         }
     },
     renderCaptionEditor() {
@@ -591,7 +623,7 @@ const app = {
 
         let newActiveIndex = -1;
         this.captions.forEach((cap, i) => {
-            const next = this.captions[i + 1]?.time || cap.time + 3;
+            const next = cap.end || this.captions[i + 1]?.time || cap.time + 3;
             if (t >= cap.time && t < next) {
                 newActiveIndex = i;
             }
@@ -674,7 +706,7 @@ const app = {
 
         const t = this.video.currentTime;
         const cap = this.captions.find((c, i) => {
-            const next = this.captions[i + 1]?.time || c.time + 3;
+            const next = c.end || this.captions[i + 1]?.time || c.time + 3;
             return t >= c.time && t < next;
         });
 
@@ -716,6 +748,11 @@ const app = {
         this.setExporting(true);
 
         const captionText = this.captions.map((c) => c.text).join(' ');
+        const captionsPayload = this.captions.map((c, idx) => ({
+            time: c.time,
+            end: c.end || this.captions[idx + 1]?.time || Math.min(this.currentClip.end, c.time + 3),
+            text: c.text
+        }));
 
         if (isBackendAvailable && this.uploadedFilename) {
             const form = new FormData();
@@ -724,6 +761,7 @@ const app = {
             form.append('end', this.currentClip.end);
             form.append('pan_x', this.panA);
             form.append('caption', captionText);
+            form.append('captions_json', JSON.stringify(captionsPayload));
 
             try {
                 const res = await fetch(`${API_URL}/render`, { method: 'POST', body: form });

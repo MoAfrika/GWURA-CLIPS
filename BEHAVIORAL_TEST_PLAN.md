@@ -5,9 +5,9 @@ Verify the full frontend/backend API flow end-to-end for `upload`, `analyze`, an
 
 ## Preconditions
 - The backend dependencies are installed in the project virtual environment.
-- The backend port is `5500` and either:
+- The backend port is `5501` and either:
   - no server is running and the test script will start `backend.py`, or
-  - a backend server is already listening on `http://127.0.0.1:5500`.
+  - a backend server is already listening on `http://127.0.0.1:5501`.
 
 ## Test Scenarios
 
@@ -50,4 +50,4 @@ Run the test script from the project root:
 python test_backend_flow.py
 ```
 
-If tests fail because port `5500` is already in use, stop the conflicting process or run the backend manually on a free port and update the script accordingly.
+If tests fail because port `5501` is already in use, stop the conflicting process or run the backend manually on a free port and update the script accordingly.

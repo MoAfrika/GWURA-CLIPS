@@ -16,9 +16,9 @@ try:
 except ImportError:
     ColorClip = None
 
-BASE_URL = "http://127.0.0.1:5500"
+BASE_URL = "http://127.0.0.1:5501"
 HOST = "127.0.0.1"
-PORT = 5500
+PORT = 5501
 BACKEND_SCRIPT = Path(__file__).with_name('backend.py')
 
 
@@ -103,7 +103,7 @@ class BackendFlowTest:
         self.started_backend = True
         if not wait_for_server(25):
             self.teardown()
-            raise RuntimeError('Backend did not become available on port 5500')
+            raise RuntimeError('Backend did not become available on port 5501')
 
     def is_port_open(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -130,7 +130,7 @@ class BackendFlowTest:
             self.test_health_check()
             self.test_upload_and_analyze()
             self.test_render()
-            print('✅ Backend flow test passed successfully.')
+            print('Backend flow test passed successfully.')
         finally:
             self.teardown()
 
@@ -142,7 +142,7 @@ class BackendFlowTest:
         data = json.loads(body)
         assert data.get('status') == 'online', 'Expected status=online'
         assert 'ai_enabled' in data, 'Expected ai_enabled key in health check response'
-        print('✔ Health check passed')
+        print('Health check passed')
 
     def test_upload_and_analyze(self):
         with open(self.sample_path, 'rb') as f:
@@ -167,7 +167,7 @@ class BackendFlowTest:
 
         self.uploaded_filename = upload_data.get('filename')
         assert self.uploaded_filename, 'Upload response did not return a filename'
-        print('✔ Upload endpoint passed')
+        print('Upload endpoint passed')
 
         analyze_body = urllib.parse.urlencode({'filename': self.uploaded_filename}).encode('utf-8')
         status, headers, response_body = fetch(
@@ -184,7 +184,7 @@ class BackendFlowTest:
         assert 'duration' in analyze_data, 'Analyze response missing duration'
         assert analyze_data['duration'] > 0, 'Analyze response duration should be positive'
         self.clips = analyze_data['clips']
-        print('✔ Analyze endpoint passed')
+        print('Analyze endpoint passed')
 
     def test_render(self):
         if not self.uploaded_filename:
@@ -216,7 +216,7 @@ class BackendFlowTest:
         if status != 200:
             raise AssertionError(f'Render failed with status {status}')
 
-        returned_type = headers.get('Content-Type', '')
+        returned_type = headers.get('Content-Type') or headers.get('content-type', '')
         if 'video/mp4' not in returned_type:
             raise AssertionError(f'Unexpected Content-Type: {returned_type}')
 
@@ -225,7 +225,7 @@ class BackendFlowTest:
         if output_path.stat().st_size < 1000:
             raise AssertionError('Rendered output appears too small')
 
-        print('✔ Render endpoint passed')
+        print('Render endpoint passed')
 
 
 if __name__ == '__main__':
