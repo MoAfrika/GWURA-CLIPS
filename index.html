@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GWURA CLIPS | Sermon to Shorts</title>
+    <meta name="description" content="Turn long-form sermons into viral ministry shorts.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="glass-nav">
+        <div class="logo">
+            <img src="logo.png" alt="GWURA CLIPS" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+            <div style="display:none; align-items:center; gap:8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-primary)">
+                    <path d="M12 2v20M7 8h10" stroke="var(--brand-red)" stroke-width="3"/>
+                    <path d="M4 22h16" stroke="var(--brand-green)" />
+                    <path d="M12 2l-8 4v16h16V6l-8-4z" stroke="var(--brand-blue)" stroke-opacity="0.7"/>
+                </svg>
+                <span style="font-weight:900; letter-spacing:-0.5px; color:var(--text-primary);">GWURA <span style="color:var(--brand-red);">CLIPS</span></span>
+            </div>
+            <span id="backend-status" class="status-badge" title="If offline, run 'python backend.py' for AI features">Offline Mode</span>
+        </div>
+        <div class="nav-right">
+            <button class="theme-toggle" id="theme-btn" type="button">
+                <svg id="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg id="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            <button class="btn-secondary" id="upload-sermon-btn" type="button">+ UPLOAD SERMON</button>
+        </div>
+        <input type="file" id="video-input" accept="video/*" hidden>
+    </nav>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div style="padding:1rem 1rem 0; font-size:0.75rem; font-weight:700; color:var(--text-muted); letter-spacing:1px;">QUOTABLE MOMENTS</div>
+            <div id="clip-list" class="clip-list">
+                <div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem; line-height:1.5;">
+                    Upload a sermon (10s to 2hrs).<br>AI will scan for every quotable, high-energy moment.
+                </div>
+            </div>
+        </aside>
+
+        <main class="stage">
+            <div class="phone-frame">
+                <canvas id="canvas" width="720" height="1280"></canvas>
+                <div id="loader" class="loader-overlay">
+                    <div class="spinner"></div>
+                    <div id="loader-text" style="margin-top:15px; font-size:0.9rem; letter-spacing:1px; color:white; font-weight:600;">PROCESSING</div>
+                </div>
+            </div>
+            <div class="timeline-container">
+                <button class="play-btn" id="btn-play" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg></button>
+                <div class="scrubber-track" id="scrubber">
+                    <div class="scrubber-fill" id="scrubber-fill"></div>
+                    <div class="scrubber-clip" id="scrubber-clip"></div>
+                    <div class="scrubber-playhead" id="playhead"></div>
+                </div>
+                <div style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);" id="time-display">00:00</div>
+            </div>
+        </main>
+
+        <aside class="controls-panel">
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-layout-btn" data-tab="layout" type="button">LAYOUT</button>
+                <button class="tab-btn" id="tab-captions-btn" data-tab="captions" type="button">CAPTIONS</button>
+                <button class="tab-btn" id="tab-brand-btn" data-tab="brand" type="button">BRAND</button>
+            </div>
+
+            <div id="tab-layout" class="tab-content active">
+                <div class="control-group">
+                    <div class="label">Video Layout</div>
+                    <div class="layout-grid">
+                        <div class="layout-opt active" id="layout-fill" data-layout="fill" type="button">
+                            <svg class="layout-icon" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2" fill="currentColor"/></svg> FILL
+                        </div>
+                        <div class="layout-opt" id="layout-fit" data-layout="fit" type="button">
+                            <svg class="layout-icon" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="8" rx="1" fill="currentColor"/><rect x="6" y="2" width="12" height="20" stroke="currentColor" fill="none" rx="2"/></svg> FIT
+                        </div>
+                        <div class="layout-opt" id="layout-split" data-layout="split" type="button">
+                            <svg class="layout-icon" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="9" rx="1" fill="currentColor"/><rect x="6" y="13" width="12" height="9" rx="1" fill="currentColor"/></svg> SPLIT
+                        </div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="label">Subject Position (Pan) <span id="pan-val">50%</span></div>
+                    <input type="range" id="pan-a" value="50" min="0" max="100">
+                </div>
+                <div class="control-group" id="group-pan-b" style="display:none;">
+                    <div class="label">Secondary Pan</div>
+                    <input type="range" id="pan-b" value="50" min="0" max="100">
+                </div>
+            </div>
+
+            <div id="tab-captions" class="tab-content">
+                <div class="control-group">
+                    <div class="label">Caption Style</div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="color" id="caption-color" value="#ffffff" style="width:40px; height:40px; border:1px solid var(--glass-border); background:none; border-radius:4px;">
+                        <select id="caption-font" style="flex:1;">
+                            <option value="Inter">Clean (Inter)</option>
+                            <option value="Impact">Bold (Impact)</option>
+                            <option value="Georgia">Traditional (Georgia)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="label">
+                    <span>Transcript Editor</span>
+                    <button class="btn-link" id="clear-captions-btn" type="button">Clear All</button>
+                </div>
+                <div id="caption-hint" style="margin-bottom:10px; font-size:0.75rem; color:var(--brand-yellow); background:var(--input-bg); padding:8px; border-radius:4px;">
+                    Offline Mode: Auto-transcription is disabled. Placeholders are provided for timing.
+                </div>
+                <div class="caption-editor" id="caption-list"></div>
+            </div>
+
+            <div id="tab-brand" class="tab-content">
+                <div class="control-group">
+                    <div class="label">Church Name</div>
+                    <input type="text" id="brand-text" placeholder="@MyChurch">
+                </div>
+                <div class="control-group">
+                    <div class="label">Logo Image</div>
+                    <input type="file" id="logo-upload">
+                </div>
+            </div>
+
+            <div style="padding:1.5rem; margin-top:auto; border-top:1px solid var(--glass-border);">
+                <button class="btn-primary" id="btn-export" disabled type="button">EXPORT CLIP</button>
+            </div>
+        </aside>
+    </div>
+
+    <video id="video" style="display:none;" playsinline crossorigin="anonymous"></video>
+    <script src="app.js" defer></script>
+</body>
+</html>
